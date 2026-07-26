@@ -5,7 +5,6 @@ import random
 pygame.init()
 
 # Configuración del tablero
-# El ancho y alto del tablero está definido en 560x600 píxeles 
 ancho, alto = 560, 600
 tamaño_celda = 560 // 8
 pantalla = None
@@ -24,11 +23,18 @@ tiempo_mensaje_bienvenida = 3000
 tiempo_mensaje_instruccion = 6000
 juego_iniciado = False
 boton_rect = None
+boton_reiniciar_rect = None
+
+# Variables para mostrar la casilla inválida
+casilla_invalida = None
+tiempo_invalido = 0
 
 # Control del turno de cada jugador y asignación aleatoria del color blanco.
 turno = 'blanco'
 player1_color = 'blanco'
 player2_color = 'negro'
+pieza_seleccionada = None
+partida_terminada = False
 
 # Generación de piezas (con bordes para evitar conflictos con los colores de las piezas)
 def generar_pieza(simbolo_unicode, color):
@@ -53,10 +59,7 @@ def generar_pieza(simbolo_unicode, color):
     superficie.blit(texto, rect)
     return superficie
 
-# Diccionario de las piezas de ajedrez (usamos Unicode para no depender de imágenes)
-# Así se evitan conflictos con los colores y el fondo de la imagen.
-# Unicode permite ponerle bordes a las piezas y que no se vuelvan invisibles al ponerlas en las casillas.
-
+# Diccionario de las piezas de ajedrez
 piezas = {
     'rey_blanco': generar_pieza('♔', blanco),
     'rey_negro': generar_pieza('♚', negro),
@@ -78,8 +81,8 @@ piezas = {
     **{f'peon_negro{i}': generar_pieza('♟', negro) for i in range(8)}
 }
 
-# Posiciones de las piezas de ajedrez
-posiciones_piezas = {
+# Posiciones iniciales estándar de las piezas de ajedrez
+posiciones_iniciales = {
     'rey_blanco': (4,0), 'rey_negro': (4,7),
     'reina_blanca': (3,0), 'reina_negra': (3,7),
     'torre_blanca': (0,0), 'torre_blanca2': (7,0),
@@ -92,6 +95,8 @@ posiciones_piezas = {
     **{f'peon_negro{i}': (i,6) for i in range(8)},
 }
 
+posiciones_piezas = posiciones_iniciales.copy()
+
 def dibujar_tablero():
     for file in range(8):
         for column in range(8):
@@ -102,7 +107,6 @@ def dibujar_pieza():
     for pieza, (column, file) in posiciones_piezas.items():
         pantalla.blit(piezas[pieza], (column * tamaño_celda, file * tamaño_celda))
 
-
 def dibujar_mensaje():
     fuente = pygame.font.SysFont('arial', 20, bold=True)
     texto = fuente.render(mensaje_estado, True, color_mensaje)
@@ -110,7 +114,6 @@ def dibujar_mensaje():
     
     pygame.draw.rect(pantalla, negro, (0, 560, ancho, 40))
     pantalla.blit(texto, rect)
-
 
 def dibujar_boton_empezar():
     global boton_rect
@@ -128,9 +131,49 @@ def dibujar_boton_empezar():
     rect_texto = texto.get_rect(center=boton_rect.center)
     pantalla.blit(texto, rect_texto)
 
-# Lógica de como funciona el juego
+def dibujar_boton_reiniciar():
+    global boton_reiniciar_rect
+    ancho_boton = 140
+    alto_boton = 36
+    x_boton = ancho - ancho_boton - 10
+    y_boton = 562
+    
+    boton_reiniciar_rect = pygame.Rect(x_boton, y_boton, ancho_boton, alto_boton)
+    pygame.draw.rect(pantalla, (50, 120, 220), boton_reiniciar_rect)
+    pygame.draw.rect(pantalla, blanco, boton_reiniciar_rect, 2)
+    
+    fuente = pygame.font.SysFont('arial', 16, bold=True)
+    texto = fuente.render('Reiniciar', True, blanco)
+    rect_texto = texto.get_rect(center=boton_reiniciar_rect.center)
+    pantalla.blit(texto, rect_texto)
 
-# 0. Función que verifica cuál pieza es aliada para evitar que la ataque y coma.
+def dibujar_movimientos_validos():
+    if pieza_seleccionada:
+        col_actual, fil_actual = posiciones_piezas[pieza_seleccionada]
+        superficie_actual = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        superficie_actual.fill((255, 255, 0, 100))
+        pantalla.blit(superficie_actual, (col_actual * tamaño_celda, fil_actual * tamaño_celda))
+        
+        superficie_movimiento = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        pygame.draw.circle(superficie_movimiento, (40, 180, 80, 180), (tamaño_celda // 2, tamaño_celda // 2), 15)
+        
+        for fila in range(8):
+            for columna in range(8):
+                if movimiento_valido(pieza_seleccionada, (columna, fila)):
+                    pantalla.blit(superficie_movimiento, (columna * tamaño_celda, fila * tamaño_celda))
+
+def dibujar_casilla_invalida():
+    global casilla_invalida
+    if casilla_invalida:
+        tiempo_actual = pygame.time.get_ticks()
+        if tiempo_actual - tiempo_invalido < 500:
+            col, fil = casilla_invalida
+            superficie_error = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+            superficie_error.fill((255, 0, 0, 120))
+            pantalla.blit(superficie_error, (col * tamaño_celda, fil * tamaño_celda))
+        else:
+            casilla_invalida = None
+
 def obtener_color_pieza(pieza):
     if 'blanco' in pieza or 'blanca' in pieza:
         return 'blanco'
@@ -138,7 +181,6 @@ def obtener_color_pieza(pieza):
         return 'negro'
     return 'negro'
 
-# 1. Función para verificar dónde está cada pieza y mostrarla en la interfaz del tablero
 def obtener_pieza_en(col, fil, posiciones=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
     for pieza, (c, f) in posiciones_a_usar.items():
@@ -146,7 +188,6 @@ def obtener_pieza_en(col, fil, posiciones=None):
             return pieza
     return None
 
-# 2. Verifica si el camino al que quiera mover la pieza está libre u ocupado
 def camino_libre(pieza, nueva_posicion, posiciones=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
     col, fila = posiciones_a_usar[pieza]
@@ -181,28 +222,22 @@ def movimiento_base_valido(pieza, nueva_posicion, posiciones=None):
 
     if 'rey' in pieza:
         return abs(col - nueva_col) <= 1 and abs(fila - nueva_fila) <= 1
-    
     elif 'reina' in pieza:
         if col == nueva_col or fila == nueva_fila or abs(col - nueva_col) == abs(fila - nueva_fila):
             return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
         return False
-        
     elif 'torre' in pieza:
         if col == nueva_col or fila == nueva_fila:
             return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
         return False
-        
     elif 'alfil' in pieza:
         if abs(col - nueva_col) == abs(fila - nueva_fila):
             return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
         return False
-        
     elif 'caballo' in pieza:
         return (abs(col - nueva_col), abs(fila - nueva_fila)) in [(1,2), (2,1)]
-        
     elif 'peon' in pieza:
         direccion = 1 if 'blanco' in pieza else -1
-        
         if nueva_col == col:
             if nueva_fila == fila + direccion and not pieza_destino:
                 return True
@@ -211,23 +246,17 @@ def movimiento_base_valido(pieza, nueva_posicion, posiciones=None):
                     if not obtener_pieza_en(col, fila + direccion, posiciones_a_usar):
                         return True
             return False
-            
         if abs(nueva_col - col) == 1 and nueva_fila == fila + direccion:
             return pieza_destino is not None
-        return False
-
     return False
-
 
 def movimiento_valido(pieza, nueva_posicion, posiciones=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
     if not movimiento_base_valido(pieza, nueva_posicion, posiciones_a_usar):
         return False
-
     color = obtener_color_pieza(pieza)
     posiciones_simuladas = simular_movimiento(pieza, nueva_posicion, posiciones_a_usar)
     return not en_jaque(color, posiciones_simuladas)
-
 
 def pieza_ataca_cuadro(pieza, nueva_posicion, posiciones=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
@@ -263,12 +292,10 @@ def pieza_ataca_cuadro(pieza, nueva_posicion, posiciones=None):
         return abs(nueva_col - col) == 1 and nueva_fila == fila + direccion
     return False
 
-# 4. Comprueba cuál bando está en jaque
 def obtener_rey(color, posiciones=None):
     nombre_rey = 'rey_blanco' if color == 'blanco' else 'rey_negro'
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
     return nombre_rey, posiciones_a_usar[nombre_rey]
-
 
 def en_jaque(color, posiciones=None):
     rey, (col_rey, fil_rey) = obtener_rey(color, posiciones)
@@ -283,7 +310,6 @@ def en_jaque(color, posiciones=None):
             return True
     return False
 
-# 5. Comprueba si el rey está en jaque o jaque mate
 def simular_movimiento(pieza, nueva_posicion, posiciones):
     posiciones_nuevas = posiciones.copy()
     pieza_destino = obtener_pieza_en(nueva_posicion[0], nueva_posicion[1], posiciones_nuevas)
@@ -292,7 +318,6 @@ def simular_movimiento(pieza, nueva_posicion, posiciones):
     posiciones_nuevas[pieza] = nueva_posicion
     return posiciones_nuevas
 
-# 6. Saber si un bando tiene algún movimiento válido dentro del juego
 def hay_movimientos_legales(color, posiciones=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
 
@@ -311,7 +336,6 @@ def hay_movimientos_legales(color, posiciones=None):
 
     return False
 
-# 7. Evaluar si la partida está en jaque o jaque mate dependiendo del bando (negro o blanco)
 def evaluar_estado(turno_actual):
     if en_jaque(turno_actual):
         if not hay_movimientos_legales(turno_actual):
@@ -319,10 +343,24 @@ def evaluar_estado(turno_actual):
         return 'jaque'
     return 'jugando'
 
-# Bucle principal que mantiene el juego abierto y llamada a las funciones del juego
-# Este llama al botón de empezar el juego para que al apretarlo libere el tablero para hacer los movimientos
+def reiniciar_partida():
+    global posiciones_piezas, turno, player1_color, player2_color, pieza_seleccionada
+    global partida_terminada, mensaje_estado, color_mensaje, tiempo_inicio, casilla_invalida
+    
+    posiciones_piezas = posiciones_iniciales.copy()
+    player1_color = random.choice(['blanco', 'negro'])
+    player2_color = 'negro' if player1_color == 'blanco' else 'blanco'
+    turno = 'blanco'
+    pieza_seleccionada = None
+    partida_terminada = False
+    casilla_invalida = None
+    tiempo_inicio = pygame.time.get_ticks()
+    mensaje_estado = 'Recuerda que el blanco empieza primero'
+    color_mensaje = blanco
+
 def main():
-    global pantalla, turno, posiciones_piezas, pieza_seleccionada, mensaje_estado, color_mensaje, tiempo_inicio, juego_iniciado, player1_color, player2_color
+    global pantalla, turno, posiciones_piezas, pieza_seleccionada, mensaje_estado, color_mensaje
+    global tiempo_inicio, juego_iniciado, player1_color, player2_color, casilla_invalida, tiempo_invalido, partida_terminada
 
     pantalla = pygame.display.set_mode((ancho, alto))
     pygame.display.set_caption('Ajedrez')
@@ -332,22 +370,23 @@ def main():
     pieza_seleccionada = None
     partida_terminada = False
     tiempo_inicio = pygame.time.get_ticks()
-    mensaje_estado = 'Bienvenido a Chess Game'
+    mensaje_estado = 'Bienvenido al Ajedrez'
     color_mensaje = blanco
 
     while True:
         tiempo_actual = pygame.time.get_ticks()
         tiempo_transcurrido = tiempo_actual - tiempo_inicio
         
-        if tiempo_transcurrido > tiempo_mensaje_instruccion and mensaje_estado == 'Recuerda que el blanco empieza primero':
-            if turno == player1_color:
-                mensaje_estado = 'Turno del Jugador 1'
-            else:
-                mensaje_estado = 'Turno del Jugador 2'
-            color_mensaje = blanco
-        elif tiempo_transcurrido > tiempo_mensaje_bienvenida and mensaje_estado.startswith('Bienvenido'):
-            mensaje_estado = 'Recuerda que el blanco empieza primero'
-            color_mensaje = blanco
+        if juego_iniciado and not partida_terminada:
+            if tiempo_transcurrido > tiempo_mensaje_instruccion and mensaje_estado == 'Recuerda que el blanco empieza primero':
+                if turno == player1_color:
+                    mensaje_estado = 'Turno del Jugador 1'
+                else:
+                    mensaje_estado = 'Turno del Jugador 2'
+                color_mensaje = blanco
+            elif tiempo_transcurrido > tiempo_mensaje_bienvenida and mensaje_estado.startswith('Bienvenido'):
+                mensaje_estado = 'Recuerda que el blanco empieza primero'
+                color_mensaje = blanco
         
         pantalla.fill(blanco)
         for evento in pygame.event.get():
@@ -364,6 +403,10 @@ def main():
                     mensaje_estado = 'Recuerda que el blanco empieza primero'
                     continue
                 
+                if partida_terminada and boton_reiniciar_rect and boton_reiniciar_rect.collidepoint(x, y):
+                    reiniciar_partida()
+                    continue
+
                 if partida_terminada or not juego_iniciado:
                     continue
 
@@ -393,34 +436,40 @@ def main():
                             else:
                                 mensaje_estado = f'Jaque mate - Gana Jugador 1'
                             color_mensaje = rojo
-                            print(f"Jaque mate para {turno}.")
                         elif estado == 'jaque':
                             if turno == player1_color:
                                 mensaje_estado = f'¡Jugador 1 está en jaque!'
                             else:
                                 mensaje_estado = f'¡Jugador 2 está en jaque!'
                             color_mensaje = rojo
-                            print(f"¡{turno} está en jaque!")
                     else:
-                        mensaje_estado = 'Movimiento inválido. Revisa el camino o si tu rey queda en jaque.'
-                        color_mensaje = rojo
+                        casilla_invalida = (columna, fila)
+                        tiempo_invalido = pygame.time.get_ticks()
 
                     pieza_seleccionada = None
 
                 else:
                     for pieza, (col, fil) in posiciones_piezas.items():
                         if (col, fil) == (columna, fila):
-                            if obtener_color_pieza(pieza) == turno:
+                            color_pieza = obtener_color_pieza(pieza)
+                            if color_pieza == turno:
                                 pieza_seleccionada = pieza
                                 break
 
         dibujar_tablero()
+        dibujar_movimientos_validos()
+        dibujar_casilla_invalida()
         dibujar_pieza()
+        
         if not juego_iniciado:
             dibujar_boton_empezar()
+            
         dibujar_mensaje()
+        
+        if partida_terminada:
+            dibujar_boton_reiniciar()
+            
         pygame.display.flip()
-
 
 if __name__ == '__main__':
     main()

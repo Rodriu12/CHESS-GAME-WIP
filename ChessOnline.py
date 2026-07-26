@@ -1,6 +1,3 @@
-# Este modo usa la misma lógica del modo offline
-# Solo cambia lo que es los turnos aleatorios y algunas funciones para adaptarlas al modo online.
-
 import pygame
 import sys
 import socket
@@ -27,6 +24,10 @@ mensaje_estado = 'Bienvenido a Chess Game'
 color_mensaje = blanco
 juego_iniciado = False
 
+# Variables para mostrar la casilla inválida
+casilla_invalida = None
+tiempo_invalido = 0
+
 # Lógica de la red al hostear la partida y a la conexión entrante del otro jugador
 HOST = 'localhost'
 PORT = 5555
@@ -45,7 +46,7 @@ net_status = 'none'
 turno = 'blanco'
 partida_terminada = False
 
-# Generación de piezas (con bordes para evitar conflictos con los colores de las piezas)
+# Generación de piezas
 def generar_pieza(simbolo_unicode, color):
     superficie = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
     fuente = pygame.font.SysFont('segoeuisymbol', int(tamaño_celda * 1.0))
@@ -68,10 +69,7 @@ def generar_pieza(simbolo_unicode, color):
     superficie.blit(texto, rect)
     return superficie
 
-# Diccionario de las piezas de ajedrez (usamos Unicode para no depender de imágenes)
-# Así se evitan conflictos con los colores y el fondo de la imagen.
-# Unicode permite ponerle bordes a las piezas y que no se vuelvan invisibles al ponerlas en las casillas.
-
+# Diccionario de las piezas de ajedrez
 piezas = {
     'rey_blanco': generar_pieza('♔', blanco), 'rey_negro': generar_pieza('♚', negro),
     'reina_blanca': generar_pieza('♕', blanco), 'reina_negra': generar_pieza('♛', negro),
@@ -99,7 +97,6 @@ posiciones_piezas = {
     **{f'peon_negro{i}': (i,6) for i in range(8)},
 }
 
-# usamos threads para la lógica de la red
 def hilo_esperar_host(ip_escucha):
     global sock, net_status, mensaje_estado
     try:
@@ -154,7 +151,6 @@ def enviar_datos(mensaje):
         except:
             pass
 
-# Funciones que hacen que el juego funcione óptimamente
 def dibujar_tablero():
     for file in range(8):
         for column in range(8):
@@ -180,7 +176,33 @@ def dibujar_boton(texto, rect, color_fondo, color_texto):
     rect_texto = texto_surf.get_rect(center=rect.center)
     pantalla.blit(texto_surf, rect_texto)
 
-# Lógica del juego para validar movimientos, caminos libres, entre otros.
+def dibujar_movimientos_validos():
+    if pieza_seleccionada:
+        col_actual, fil_actual = posiciones_piezas[pieza_seleccionada]
+        superficie_actual = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        superficie_actual.fill((255, 255, 0, 100))
+        pantalla.blit(superficie_actual, (col_actual * tamaño_celda, fil_actual * tamaño_celda))
+        
+        superficie_movimiento = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        pygame.draw.circle(superficie_movimiento, (40, 180, 80, 180), (tamaño_celda // 2, tamaño_celda // 2), 15)
+        
+        for fila in range(8):
+            for columna in range(8):
+                if movimiento_valido(pieza_seleccionada, (columna, fila)):
+                    pantalla.blit(superficie_movimiento, (columna * tamaño_celda, fila * tamaño_celda))
+
+def dibujar_casilla_invalida():
+    global casilla_invalida
+    if casilla_invalida:
+        tiempo_actual = pygame.time.get_ticks()
+        if tiempo_actual - tiempo_invalido < 500:  # Mostrar por 500 ms
+            col, fil = casilla_invalida
+            superficie_error = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+            superficie_error.fill((255, 0, 0, 120))
+            pantalla.blit(superficie_error, (col * tamaño_celda, fil * tamaño_celda))
+        else:
+            casilla_invalida = None
+
 def obtener_color_pieza(pieza):
     if 'blanco' in pieza or 'blanca' in pieza:
         return 'blanco'
@@ -192,7 +214,6 @@ def obtener_pieza_en(col, fil, posiciones=None):
         if (c, f) == (col, fil):
             return pieza
     return None
-
 
 def camino_libre(pieza, nueva_posicion, posiciones=None, color_ignorado=None):
     posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
@@ -340,12 +361,11 @@ def evaluar_estado(turno_actual):
         return 'jaque'
     return 'jugando'
 
-# Bucle principal que mantiene el juego abierto y llamada a las funciones del juego
 def main():
     global pantalla, turno, posiciones_piezas, pieza_seleccionada
     global mensaje_estado, color_mensaje, juego_iniciado
     global modo_online, mi_color, player1_color, player2_color, sock, net_thread, partida_terminada, net_status
-    global host_ip_input, ip_input_activo
+    global host_ip_input, ip_input_activo, casilla_invalida, tiempo_invalido
 
     pantalla = pygame.display.set_mode((ancho, alto))
     pygame.display.set_caption('Ajedrez')
@@ -411,7 +431,6 @@ def main():
 
         pygame.display.flip()
 
-    # Configuración de la red y la conexión para jugar remotamente o localmente
     if modo_seleccionado in ['host', 'join']:
         modo_online = True
         net_status = 'waiting'
@@ -593,8 +612,10 @@ def main():
                                 mensaje_estado = f'¡Jugador {"1" if turno=="blanco" else "2"} está en jaque!'
                             color_mensaje = rojo
                     else:
-                        mensaje_estado = 'Movimiento inválido. Revisa el camino o si tu rey queda en jaque.'
-                        color_mensaje = rojo
+                        # Guardar la casilla clickeada como inválida para pintarla de rojo
+                        casilla_invalida = (columna, fila)
+                        tiempo_invalido = pygame.time.get_ticks()
+                    
                     pieza_seleccionada = None
                         
                 else:
@@ -605,6 +626,8 @@ def main():
                                 break
                             
         dibujar_tablero()
+        dibujar_movimientos_validos()
+        dibujar_casilla_invalida()
         dibujar_pieza()
         dibujar_mensaje()
         pygame.display.flip()

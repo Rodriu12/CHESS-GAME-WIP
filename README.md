@@ -103,6 +103,13 @@ Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Ju
 * **Sockets y Threading (para el modo Online)**
 * **PyInstaller / auto-py-to-exe (para generar los ejecutables `.exe`)**
 
+## Videos de demostración del juego
+* **Modo dos jugadores en el mismo pc**
+![OFFLINEMODE](videos/ajedrez_demo.mp4)
+
+* **Modo online dos jugadores dentro de la misma red (LAN)**
+![ONLINEMODE]()
+
 ## ¿Dónde ver los cambios recientes?
 Consulta el [registro de actualizaciones](CHANGELOG.md) para ver los cambios y mejoras recientes que se hagan durante este tiempo y ponerte al día.
 
