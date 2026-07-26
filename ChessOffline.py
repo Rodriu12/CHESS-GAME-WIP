@@ -132,8 +132,10 @@ def dibujar_boton_empezar():
 
 # 0. Función que verifica cuál pieza es aliada para evitar que la ataque y coma.
 def obtener_color_pieza(pieza):
-    if 'blanco' in pieza or pieza == 'reina_blanca':
+    if 'blanco' in pieza or 'blanca' in pieza:
         return 'blanco'
+    if 'negro' in pieza or 'negra' in pieza:
+        return 'negro'
     return 'negro'
 
 # 1. Función para verificar dónde está cada pieza y mostrarla en la interfaz del tablero
@@ -228,7 +230,38 @@ def movimiento_valido(pieza, nueva_posicion, posiciones=None):
 
 
 def pieza_ataca_cuadro(pieza, nueva_posicion, posiciones=None):
-    return movimiento_base_valido(pieza, nueva_posicion, posiciones)
+    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
+    col, fila = posiciones_a_usar[pieza]
+    nueva_col, nueva_fila = nueva_posicion
+
+    if (col, fila) == (nueva_col, nueva_fila):
+        return False
+
+    pieza_destino = obtener_pieza_en(nueva_col, nueva_fila, posiciones_a_usar)
+    if pieza_destino:
+        if obtener_color_pieza(pieza) == obtener_color_pieza(pieza_destino):
+            return False
+
+    if 'rey' in pieza:
+        return abs(col - nueva_col) <= 1 and abs(fila - nueva_fila) <= 1
+    elif 'reina' in pieza:
+        if col == nueva_col or fila == nueva_fila or abs(col - nueva_col) == abs(fila - nueva_fila):
+            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+        return False
+    elif 'torre' in pieza:
+        if col == nueva_col or fila == nueva_fila:
+            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+        return False
+    elif 'alfil' in pieza:
+        if abs(col - nueva_col) == abs(fila - nueva_fila):
+            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+        return False
+    elif 'caballo' in pieza:
+        return (abs(col - nueva_col), abs(fila - nueva_fila)) in [(1, 2), (2, 1)]
+    elif 'peon' in pieza:
+        direccion = 1 if 'blanco' in pieza else -1
+        return abs(nueva_col - col) == 1 and nueva_fila == fila + direccion
+    return False
 
 # 4. Comprueba cuál bando está en jaque
 def obtener_rey(color, posiciones=None):
@@ -341,7 +374,7 @@ def main():
                         pieza_capturada = obtener_pieza_en(columna, fila)
                         if pieza_capturada:
                             del posiciones_piezas[pieza_capturada]
-                        
+
                         posiciones_piezas[pieza_seleccionada] = (columna, fila)
                         turno = 'negro' if turno == 'blanco' else 'blanco'
 
@@ -368,16 +401,19 @@ def main():
                                 mensaje_estado = f'¡Jugador 2 está en jaque!'
                             color_mensaje = rojo
                             print(f"¡{turno} está en jaque!")
-                            
+                    else:
+                        mensaje_estado = 'Movimiento inválido. Revisa el camino o si tu rey queda en jaque.'
+                        color_mensaje = rojo
+
                     pieza_seleccionada = None
-                    
+
                 else:
                     for pieza, (col, fil) in posiciones_piezas.items():
                         if (col, fil) == (columna, fila):
-                            if ('blanco' in pieza and turno == 'blanco') or ('negro' in pieza and turno == 'negro'):
+                            if obtener_color_pieza(pieza) == turno:
                                 pieza_seleccionada = pieza
                                 break
-                            
+
         dibujar_tablero()
         dibujar_pieza()
         if not juego_iniciado:
