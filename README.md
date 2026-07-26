@@ -79,7 +79,7 @@ Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Ju
 
 * Esperarás a que el Jugador 2 se conecte. El juego te asignará un color aleatorio.
 
-**Cliente (El que se une):**
+**Cliente (Jugador 2):**
 
 * Ejecuta ChessOnline.exe.
 
