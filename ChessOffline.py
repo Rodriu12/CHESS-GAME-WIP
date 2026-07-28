@@ -421,10 +421,11 @@ def actualizar_turno_y_estado():
     estado = evaluar_estado(turno)
     if estado == 'jaque_mate':
         partida_terminada = True
-        if modo_ia and turno == player1_color:
-            ganador = 'Jugador'
-        elif modo_ia and turno == player2_color:
-            ganador = 'IA'
+        if modo_ia:
+            if turno == player2_color:
+                ganador = 'Jugador'
+            else:
+                ganador = 'IA'
         else:
             ganador = 'Jugador 2' if turno == 'blanco' else 'Jugador 1'
         mensaje_estado = f'Jaque mate - Gana {ganador}'
