@@ -9,13 +9,15 @@ ancho, alto = 560, 600
 tamaño_celda = 560 // 8
 pantalla = None
 
-# Colores del tablero y de los mensajes que envía el juego.
+# Colores
 blanco = (255, 255, 255)
 negro = (0, 0, 0)
 rojo = (220, 50, 50)
 verde = (40, 180, 80)
+gris = (150, 150, 150)
+fondo_menu = (50, 50, 50, 220)
 
-# Mensajes de estado como el de bienvenida y también de ganador, jaque o jaque mate
+# Variables de estado del juego
 mensaje_estado = 'Bienvenido a Chess Game'
 color_mensaje = blanco
 tiempo_inicio = None
@@ -25,31 +27,27 @@ juego_iniciado = False
 boton_rect = None
 boton_reiniciar_rect = None
 
-# Variables para mostrar la casilla inválida
 casilla_invalida = None
 tiempo_invalido = 0
 
-# Control del turno de cada jugador y asignación aleatoria del color blanco.
 turno = 'blanco'
 player1_color = 'blanco'
 player2_color = 'negro'
 pieza_seleccionada = None
 partida_terminada = False
 
-# Generación de piezas (con bordes para evitar conflictos con los colores de las piezas)
+# Variables para Enroque y Promoción
+piezas_movidas = set()
+promocion_pendiente = None  
+contador_nuevas_piezas = 0  
+
 def generar_pieza(simbolo_unicode, color):
     superficie = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
     fuente = pygame.font.SysFont('segoeuisymbol', int(tamaño_celda * 1.0))
-    
     texto = fuente.render(simbolo_unicode, True, color)
     rect = texto.get_rect(center=(tamaño_celda // 2, tamaño_celda // 2))
     
-    if color == blanco:
-        color_borde = negro
-    elif color == negro:
-        color_borde = blanco
-    else:
-        color_borde = (128, 128, 128)
+    color_borde = negro if color == blanco else blanco if color == negro else (128, 128, 128)
 
     for dx in [-1, 1]:
         for dy in [-1, 1]:
@@ -59,29 +57,27 @@ def generar_pieza(simbolo_unicode, color):
     superficie.blit(texto, rect)
     return superficie
 
-# Diccionario de las piezas de ajedrez
+# Símbolos base para la promoción
+simbolos_piezas = {
+    'reina': {'blanco': '♕', 'negro': '♛'},
+    'torre': {'blanco': '♖', 'negro': '♜'},
+    'alfil': {'blanco': '♗', 'negro': '♝'},
+    'caballo': {'blanco': '♘', 'negro': '♞'}
+}
+
 piezas = {
-    'rey_blanco': generar_pieza('♔', blanco),
-    'rey_negro': generar_pieza('♚', negro),
-    'reina_blanca': generar_pieza('♕', blanco),
-    'reina_negra': generar_pieza('♛', negro),
-    'torre_blanca': generar_pieza('♖', blanco),
-    'torre_blanca2': generar_pieza('♖', blanco),
-    'torre_negra': generar_pieza('♜', negro),
-    'torre_negra2': generar_pieza('♜', negro),
-    'alfil_blanco': generar_pieza('♗', blanco),
-    'alfil_blanco2': generar_pieza('♗', blanco),
-    'alfil_negro': generar_pieza('♝', negro),
-    'alfil_negro2': generar_pieza('♝', negro),
-    'caballo_blanco': generar_pieza('♘', blanco),
-    'caballo_blanco2': generar_pieza('♘', blanco),
-    'caballo_negro': generar_pieza('♞', negro),
-    'caballo_negro2': generar_pieza('♞', negro),
+    'rey_blanco': generar_pieza('♔', blanco), 'rey_negro': generar_pieza('♚', negro),
+    'reina_blanca': generar_pieza('♕', blanco), 'reina_negra': generar_pieza('♛', negro),
+    'torre_blanca': generar_pieza('♖', blanco), 'torre_blanca2': generar_pieza('♖', blanco),
+    'torre_negra': generar_pieza('♜', negro), 'torre_negra2': generar_pieza('♜', negro),
+    'alfil_blanco': generar_pieza('♗', blanco), 'alfil_blanco2': generar_pieza('♗', blanco),
+    'alfil_negro': generar_pieza('♝', negro), 'alfil_negro2': generar_pieza('♝', negro),
+    'caballo_blanco': generar_pieza('♘', blanco), 'caballo_blanco2': generar_pieza('♘', blanco),
+    'caballo_negro': generar_pieza('♞', negro), 'caballo_negro2': generar_pieza('♞', negro),
     **{f'peon_blanco{i}': generar_pieza('♙', blanco) for i in range(8)},
     **{f'peon_negro{i}': generar_pieza('♟', negro) for i in range(8)}
 }
 
-# Posiciones iniciales estándar de las piezas de ajedrez
 posiciones_iniciales = {
     'rey_blanco': (4,0), 'rey_negro': (4,7),
     'reina_blanca': (3,0), 'reina_negra': (3,7),
@@ -97,142 +93,78 @@ posiciones_iniciales = {
 
 posiciones_piezas = posiciones_iniciales.copy()
 
-def dibujar_tablero():
-    for file in range(8):
-        for column in range(8):
-            color = blanco if (file + column) % 2 == 0 else negro
-            pygame.draw.rect(pantalla, color, (column * tamaño_celda, file * tamaño_celda, tamaño_celda, tamaño_celda))
-
-def dibujar_pieza():
-    for pieza, (column, file) in posiciones_piezas.items():
-        pantalla.blit(piezas[pieza], (column * tamaño_celda, file * tamaño_celda))
-
-def dibujar_mensaje():
-    fuente = pygame.font.SysFont('arial', 20, bold=True)
-    texto = fuente.render(mensaje_estado, True, color_mensaje)
-    rect = texto.get_rect(center=(ancho // 2, 560 + 20))
-    
-    pygame.draw.rect(pantalla, negro, (0, 560, ancho, 40))
-    pantalla.blit(texto, rect)
-
-def dibujar_boton_empezar():
-    global boton_rect
-    ancho_boton = 150
-    alto_boton = 40
-    x_boton = (ancho - ancho_boton) // 2
-    y_boton = 280
-    
-    boton_rect = pygame.Rect(x_boton, y_boton, ancho_boton, alto_boton)
-    pygame.draw.rect(pantalla, verde, boton_rect)
-    pygame.draw.rect(pantalla, (0, 0, 0), boton_rect, 2)
-    
-    fuente = pygame.font.SysFont('arial', 18, bold=True)
-    texto = fuente.render('Empezar', True, (255, 255, 255))
-    rect_texto = texto.get_rect(center=boton_rect.center)
-    pantalla.blit(texto, rect_texto)
-
-def dibujar_boton_reiniciar():
-    global boton_reiniciar_rect
-    ancho_boton = 140
-    alto_boton = 36
-    x_boton = ancho - ancho_boton - 10
-    y_boton = 562
-    
-    boton_reiniciar_rect = pygame.Rect(x_boton, y_boton, ancho_boton, alto_boton)
-    pygame.draw.rect(pantalla, (50, 120, 220), boton_reiniciar_rect)
-    pygame.draw.rect(pantalla, blanco, boton_reiniciar_rect, 2)
-    
-    fuente = pygame.font.SysFont('arial', 16, bold=True)
-    texto = fuente.render('Reiniciar', True, blanco)
-    rect_texto = texto.get_rect(center=boton_reiniciar_rect.center)
-    pantalla.blit(texto, rect_texto)
-
-def dibujar_movimientos_validos():
-    if pieza_seleccionada:
-        col_actual, fil_actual = posiciones_piezas[pieza_seleccionada]
-        superficie_actual = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
-        superficie_actual.fill((255, 255, 0, 100))
-        pantalla.blit(superficie_actual, (col_actual * tamaño_celda, fil_actual * tamaño_celda))
-        
-        superficie_movimiento = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
-        pygame.draw.circle(superficie_movimiento, (40, 180, 80, 180), (tamaño_celda // 2, tamaño_celda // 2), 15)
-        
-        for fila in range(8):
-            for columna in range(8):
-                if movimiento_valido(pieza_seleccionada, (columna, fila)):
-                    pantalla.blit(superficie_movimiento, (columna * tamaño_celda, fila * tamaño_celda))
-
-def dibujar_casilla_invalida():
-    global casilla_invalida
-    if casilla_invalida:
-        tiempo_actual = pygame.time.get_ticks()
-        if tiempo_actual - tiempo_invalido < 500:
-            col, fil = casilla_invalida
-            superficie_error = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
-            superficie_error.fill((255, 0, 0, 120))
-            pantalla.blit(superficie_error, (col * tamaño_celda, fil * tamaño_celda))
-        else:
-            casilla_invalida = None
-
 def obtener_color_pieza(pieza):
-    if 'blanco' in pieza or 'blanca' in pieza:
-        return 'blanco'
-    if 'negro' in pieza or 'negra' in pieza:
-        return 'negro'
+    if 'blanco' in pieza or 'blanca' in pieza: return 'blanco'
     return 'negro'
 
 def obtener_pieza_en(col, fil, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    for pieza, (c, f) in posiciones_a_usar.items():
-        if (c, f) == (col, fil):
-            return pieza
+    pos = posiciones_piezas if posiciones is None else posiciones
+    for p, (c, f) in pos.items():
+        if (c, f) == (col, fil): return p
     return None
 
-def camino_libre(pieza, nueva_posicion, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    col, fila = posiciones_a_usar[pieza]
-    nueva_col, nueva_fila = nueva_posicion
-    
-    dx = 1 if nueva_col > col else -1 if nueva_col < col else 0
-    dy = 1 if nueva_fila > fila else -1 if nueva_fila < fila else 0
-    
-    x, y = col + dx, fila + dy
-    while (x, y) != (nueva_col, nueva_fila):
-        if obtener_pieza_en(x, y, posiciones_a_usar):
-            return False
+def camino_libre(col_origen, fil_origen, col_destino, fil_destino, posiciones=None):
+    pos = posiciones_piezas if posiciones is None else posiciones
+    dx = 1 if col_destino > col_origen else -1 if col_destino < col_origen else 0
+    dy = 1 if fil_destino > fil_origen else -1 if fil_destino < fil_origen else 0
+    x, y = col_origen + dx, fil_origen + dy
+    while (x, y) != (col_destino, fil_destino):
+        if obtener_pieza_en(x, y, pos): return False
         x += dx
         y += dy
     return True
 
-def movimiento_base_valido(pieza, nueva_posicion, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    col, fila = posiciones_a_usar[pieza]
+def casilla_atacada(col, fil, color_defensor, posiciones):
+    color_enemigo = 'negro' if color_defensor == 'blanco' else 'blanco'
+    for pieza, (c, f) in posiciones.items():
+        if obtener_color_pieza(pieza) == color_enemigo:
+            if movimiento_base_valido(pieza, (col, fil), posiciones, ignorar_enroque=True):
+                return True
+    return False
+
+def movimiento_base_valido(pieza, nueva_posicion, posiciones=None, ignorar_enroque=False):
+    pos = posiciones_piezas if posiciones is None else posiciones
+    col, fila = pos[pieza]
     nueva_col, nueva_fila = nueva_posicion
     
-    if (col, fila) == (nueva_col, nueva_fila):
+    if (col, fila) == (nueva_col, nueva_fila): return False
+        
+    pieza_destino = obtener_pieza_en(nueva_col, nueva_fila, pos)
+    if pieza_destino and obtener_color_pieza(pieza) == obtener_color_pieza(pieza_destino):
         return False
-        
-    pieza_destino = obtener_pieza_en(nueva_col, nueva_fila, posiciones_a_usar)
-    if pieza_destino:
-        color_origen = obtener_color_pieza(pieza)
-        color_destino = obtener_color_pieza(pieza_destino)
-        
-        if color_origen == color_destino:
-            return False
 
     if 'rey' in pieza:
-        return abs(col - nueva_col) <= 1 and abs(fila - nueva_fila) <= 1
+        if abs(col - nueva_col) <= 1 and abs(fila - nueva_fila) <= 1:
+            return True
+        if not ignorar_enroque and fila == nueva_fila and abs(col - nueva_col) == 2:
+            if pieza in piezas_movidas or en_jaque(obtener_color_pieza(pieza), pos):
+                return False
+            
+            if nueva_col == 6:
+                torre = f'torre_{"blanca" if obtener_color_pieza(pieza) == "blanco" else "negra"}2'
+                if torre in pos and torre not in piezas_movidas:
+                    if camino_libre(col, fila, 7, fila, pos):
+                        if not casilla_atacada(5, fila, obtener_color_pieza(pieza), pos):
+                            return True
+            elif nueva_col == 2:
+                torre = f'torre_{"blanca" if obtener_color_pieza(pieza) == "blanco" else "negra"}'
+                if torre in pos and torre not in piezas_movidas:
+                    if camino_libre(col, fila, 0, fila, pos):
+                        if not casilla_atacada(3, fila, obtener_color_pieza(pieza), pos):
+                            return True
+        return False
+        
     elif 'reina' in pieza:
         if col == nueva_col or fila == nueva_fila or abs(col - nueva_col) == abs(fila - nueva_fila):
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+            return camino_libre(col, fila, nueva_col, nueva_fila, pos)
         return False
     elif 'torre' in pieza:
         if col == nueva_col or fila == nueva_fila:
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+            return camino_libre(col, fila, nueva_col, nueva_fila, pos)
         return False
     elif 'alfil' in pieza:
         if abs(col - nueva_col) == abs(fila - nueva_fila):
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
+            return camino_libre(col, fila, nueva_col, nueva_fila, pos)
         return False
     elif 'caballo' in pieza:
         return (abs(col - nueva_col), abs(fila - nueva_fila)) in [(1,2), (2,1)]
@@ -243,111 +175,148 @@ def movimiento_base_valido(pieza, nueva_posicion, posiciones=None):
                 return True
             if (fila == 1 and 'blanco' in pieza) or (fila == 6 and 'negro' in pieza):
                 if nueva_fila == fila + 2 * direccion and not pieza_destino:
-                    if not obtener_pieza_en(col, fila + direccion, posiciones_a_usar):
+                    if not obtener_pieza_en(col, fila + direccion, pos):
                         return True
             return False
         if abs(nueva_col - col) == 1 and nueva_fila == fila + direccion:
             return pieza_destino is not None
     return False
 
-def movimiento_valido(pieza, nueva_posicion, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    if not movimiento_base_valido(pieza, nueva_posicion, posiciones_a_usar):
-        return False
-    color = obtener_color_pieza(pieza)
-    posiciones_simuladas = simular_movimiento(pieza, nueva_posicion, posiciones_a_usar)
-    return not en_jaque(color, posiciones_simuladas)
-
-def pieza_ataca_cuadro(pieza, nueva_posicion, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    col, fila = posiciones_a_usar[pieza]
-    nueva_col, nueva_fila = nueva_posicion
-
-    if (col, fila) == (nueva_col, nueva_fila):
-        return False
-
-    pieza_destino = obtener_pieza_en(nueva_col, nueva_fila, posiciones_a_usar)
+def simular_movimiento(pieza, nueva_posicion, posiciones):
+    pos_nuevas = posiciones.copy()
+    pieza_destino = obtener_pieza_en(nueva_posicion[0], nueva_posicion[1], pos_nuevas)
     if pieza_destino:
-        if obtener_color_pieza(pieza) == obtener_color_pieza(pieza_destino):
-            return False
-
-    if 'rey' in pieza:
-        return abs(col - nueva_col) <= 1 and abs(fila - nueva_fila) <= 1
-    elif 'reina' in pieza:
-        if col == nueva_col or fila == nueva_fila or abs(col - nueva_col) == abs(fila - nueva_fila):
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
-        return False
-    elif 'torre' in pieza:
-        if col == nueva_col or fila == nueva_fila:
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
-        return False
-    elif 'alfil' in pieza:
-        if abs(col - nueva_col) == abs(fila - nueva_fila):
-            return camino_libre(pieza, nueva_posicion, posiciones_a_usar)
-        return False
-    elif 'caballo' in pieza:
-        return (abs(col - nueva_col), abs(fila - nueva_fila)) in [(1, 2), (2, 1)]
-    elif 'peon' in pieza:
-        direccion = 1 if 'blanco' in pieza else -1
-        return abs(nueva_col - col) == 1 and nueva_fila == fila + direccion
-    return False
-
-def obtener_rey(color, posiciones=None):
-    nombre_rey = 'rey_blanco' if color == 'blanco' else 'rey_negro'
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-    return nombre_rey, posiciones_a_usar[nombre_rey]
+        del pos_nuevas[pieza_destino]
+    pos_nuevas[pieza] = nueva_posicion
+    return pos_nuevas
 
 def en_jaque(color, posiciones=None):
-    rey, (col_rey, fil_rey) = obtener_rey(color, posiciones)
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
+    pos = posiciones_piezas if posiciones is None else posiciones
+    nombre_rey = 'rey_blanco' if color == 'blanco' else 'rey_negro'
+    if nombre_rey not in pos: return False
+    col_rey, fil_rey = pos[nombre_rey]
+    return casilla_atacada(col_rey, fil_rey, color, pos)
 
-    for pieza, (col, fil) in posiciones_a_usar.items():
-        if pieza == rey:
-            continue
-        if obtener_color_pieza(pieza) == color:
-            continue
-        if pieza_ataca_cuadro(pieza, (col_rey, fil_rey), posiciones_a_usar):
-            return True
-    return False
+def movimiento_valido(pieza, nueva_posicion, posiciones=None):
+    pos = posiciones_piezas if posiciones is None else posiciones
+    if not movimiento_base_valido(pieza, nueva_posicion, pos):
+        return False
+    posiciones_simuladas = simular_movimiento(pieza, nueva_posicion, pos)
+    return not en_jaque(obtener_color_pieza(pieza), posiciones_simuladas)
 
-def simular_movimiento(pieza, nueva_posicion, posiciones):
-    posiciones_nuevas = posiciones.copy()
-    pieza_destino = obtener_pieza_en(nueva_posicion[0], nueva_posicion[1], posiciones_nuevas)
-    if pieza_destino:
-        del posiciones_nuevas[pieza_destino]
-    posiciones_nuevas[pieza] = nueva_posicion
-    return posiciones_nuevas
-
-def hay_movimientos_legales(color, posiciones=None):
-    posiciones_a_usar = posiciones_piezas if posiciones is None else posiciones
-
-    for pieza, (col, fil) in list(posiciones_a_usar.items()):
-        if obtener_color_pieza(pieza) != color:
-            continue
-
+def hay_movimientos_legales(color):
+    for pieza, (col, fil) in list(posiciones_piezas.items()):
+        if obtener_color_pieza(pieza) != color: continue
         for nueva_col in range(8):
             for nueva_fila in range(8):
-                if not movimiento_valido(pieza, (nueva_col, nueva_fila), posiciones_a_usar):
-                    continue
-
-                posiciones_simuladas = simular_movimiento(pieza, (nueva_col, nueva_fila), posiciones_a_usar)
-                if not en_jaque(color, posiciones_simuladas):
+                if movimiento_valido(pieza, (nueva_col, nueva_fila)):
                     return True
-
     return False
 
 def evaluar_estado(turno_actual):
     if en_jaque(turno_actual):
-        if not hay_movimientos_legales(turno_actual):
-            return 'jaque_mate'
+        if not hay_movimientos_legales(turno_actual): return 'jaque_mate'
         return 'jaque'
+    if not hay_movimientos_legales(turno_actual): return 'ahogado'
     return 'jugando'
+
+def dibujar_tablero():
+    for file in range(8):
+        for column in range(8):
+            color = blanco if (file + column) % 2 == 0 else negro
+            pygame.draw.rect(pantalla, color, (column * tamaño_celda, file * tamaño_celda, tamaño_celda, tamaño_celda))
+
+def dibujar_pieza():
+    for pieza, (column, file) in posiciones_piezas.items():
+        if pieza in piezas:  
+            pantalla.blit(piezas[pieza], (column * tamaño_celda, file * tamaño_celda))
+
+def dibujar_movimientos_validos():
+    if pieza_seleccionada:
+        col_actual, fil_actual = posiciones_piezas[pieza_seleccionada]
+        sup_actual = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        sup_actual.fill((255, 255, 0, 100))
+        pantalla.blit(sup_actual, (col_actual * tamaño_celda, fil_actual * tamaño_celda))
+        
+        sup_mov = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+        pygame.draw.circle(sup_mov, (40, 180, 80, 180), (tamaño_celda // 2, tamaño_celda // 2), 15)
+        for fila in range(8):
+            for columna in range(8):
+                if movimiento_valido(pieza_seleccionada, (columna, fila)):
+                    pantalla.blit(sup_mov, (columna * tamaño_celda, fila * tamaño_celda))
+
+def dibujar_casilla_invalida():
+    global casilla_invalida
+    if casilla_invalida:
+        if pygame.time.get_ticks() - tiempo_invalido < 500:
+            col, fil = casilla_invalida
+            sup_error = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
+            sup_error.fill((255, 0, 0, 120))
+            pantalla.blit(sup_error, (col * tamaño_celda, fil * tamaño_celda))
+        else:
+            casilla_invalida = None
+
+def dibujar_mensaje():
+    fuente = pygame.font.SysFont('arial', 20, bold=True)
+    texto = fuente.render(mensaje_estado, True, color_mensaje)
+    rect = texto.get_rect(center=(ancho // 2, 560 + 20))
+    pygame.draw.rect(pantalla, negro, (0, 560, ancho, 40))
+    pantalla.blit(texto, rect)
+
+def dibujar_boton(texto, y, ancho_btn, alto_btn, color_fondo):
+    rect = pygame.Rect((ancho - ancho_btn) // 2, y, ancho_btn, alto_btn)
+    pygame.draw.rect(pantalla, color_fondo, rect)
+    pygame.draw.rect(pantalla, blanco, rect, 2)
+    fuente = pygame.font.SysFont('arial', 18, bold=True)
+    txt_surf = fuente.render(texto, True, blanco)
+    pantalla.blit(txt_surf, txt_surf.get_rect(center=rect.center))
+    return rect
+
+def dibujar_menu_promocion():
+    if not promocion_pendiente: return None
+    
+    sup_oscura = pygame.Surface((ancho, alto), pygame.SRCALPHA)
+    sup_oscura.fill((0, 0, 0, 150))
+    pantalla.blit(sup_oscura, (0, 0))
+
+    ancho_menu, alto_menu = 300, 100
+    x_menu = (ancho - ancho_menu) // 2
+    y_menu = (alto - alto_menu) // 2
+    pygame.draw.rect(pantalla, (40, 40, 40), (x_menu, y_menu, ancho_menu, alto_menu))
+    pygame.draw.rect(pantalla, verde, (x_menu, y_menu, ancho_menu, alto_menu), 3)
+
+    opciones = ['reina', 'torre', 'alfil', 'caballo']
+    color = promocion_pendiente['color']
+    botones_rects = {}
+    
+    espacio = ancho_menu // 4
+    for i, opcion in enumerate(opciones):
+        rect_opcion = pygame.Rect(x_menu + (i * espacio), y_menu, espacio, alto_menu)
+        pygame.draw.rect(pantalla, (60, 60, 60), rect_opcion)
+        pygame.draw.rect(pantalla, (100, 100, 100), rect_opcion, 1)
+        
+        simbolo = simbolos_piezas[opcion][color]
+        img_pieza = generar_pieza(simbolo, blanco if color == 'blanco' else negro)
+        img_rect = img_pieza.get_rect(center=rect_opcion.center)
+        pantalla.blit(img_pieza, img_rect)
+        
+        botones_rects[opcion] = rect_opcion
+        
+    fuente = pygame.font.SysFont('arial', 16, bold=True)
+    txt = fuente.render("Elige tu nueva pieza", True, blanco)
+    pantalla.blit(txt, txt.get_rect(center=(ancho//2, y_menu - 20)))
+
+    return botones_rects
 
 def reiniciar_partida():
     global posiciones_piezas, turno, player1_color, player2_color, pieza_seleccionada
     global partida_terminada, mensaje_estado, color_mensaje, tiempo_inicio, casilla_invalida
+    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas
     
     posiciones_piezas = posiciones_iniciales.copy()
+    piezas_movidas.clear()
+    promocion_pendiente = None
+    contador_nuevas_piezas = 0
     player1_color = random.choice(['blanco', 'negro'])
     player2_color = 'negro' if player1_color == 'blanco' else 'blanco'
     turno = 'blanco'
@@ -358,41 +327,65 @@ def reiniciar_partida():
     mensaje_estado = 'Recuerda que el blanco empieza primero'
     color_mensaje = blanco
 
+def actualizar_turno_y_estado():
+    global turno, mensaje_estado, color_mensaje, partida_terminada
+    turno = 'negro' if turno == 'blanco' else 'blanco'
+
+    if turno == player1_color:
+        mensaje_estado = 'Turno del Jugador 1'
+        color_mensaje = blanco
+    else:
+        mensaje_estado = 'Turno del Jugador 2'
+        color_mensaje = (200, 200, 200)
+
+    estado = evaluar_estado(turno)
+    if estado == 'jaque_mate':
+        partida_terminada = True
+        ganador = 'Jugador 2' if turno == 'blanco' else 'Jugador 1'
+        mensaje_estado = f'Jaque mate - Gana {ganador}'
+        color_mensaje = rojo
+    elif estado == 'jaque':
+        jugador_jaque = 'Jugador 1' if turno == player1_color else 'Jugador 2'
+        mensaje_estado = f'¡{jugador_jaque} está en jaque!'
+        color_mensaje = rojo
+    elif estado == 'ahogado':
+        partida_terminada = True
+        mensaje_estado = 'Empate por Rey ahogado'
+        color_mensaje = gris
+
 def main():
     global pantalla, turno, posiciones_piezas, pieza_seleccionada, mensaje_estado, color_mensaje
-    global tiempo_inicio, juego_iniciado, player1_color, player2_color, casilla_invalida, tiempo_invalido, partida_terminada
+    global tiempo_inicio, juego_iniciado, player1_color, player2_color
+    global casilla_invalida, tiempo_invalido, partida_terminada
+    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas, boton_rect, boton_reiniciar_rect
 
     pantalla = pygame.display.set_mode((ancho, alto))
-    pygame.display.set_caption('Ajedrez')
-    player1_color = random.choice(['blanco', 'negro'])
-    player2_color = 'negro' if player1_color == 'blanco' else 'blanco'
-    turno = 'blanco'
-    pieza_seleccionada = None
-    partida_terminada = False
-    tiempo_inicio = pygame.time.get_ticks()
+    pygame.display.set_caption('Ajedrez con Enroque y Coronación')
+    reiniciar_partida()
+    juego_iniciado = False
     mensaje_estado = 'Bienvenido al Ajedrez'
-    color_mensaje = blanco
+    botones_promo = {}
 
     while True:
         tiempo_actual = pygame.time.get_ticks()
-        tiempo_transcurrido = tiempo_actual - tiempo_inicio
         
-        if juego_iniciado and not partida_terminada:
+        if juego_iniciado and not partida_terminada and not promocion_pendiente:
+            tiempo_transcurrido = tiempo_actual - tiempo_inicio
             if tiempo_transcurrido > tiempo_mensaje_instruccion and mensaje_estado == 'Recuerda que el blanco empieza primero':
                 if turno == player1_color:
                     mensaje_estado = 'Turno del Jugador 1'
+                    color_mensaje = blanco
                 else:
                     mensaje_estado = 'Turno del Jugador 2'
-                color_mensaje = blanco
+                    color_mensaje = (200, 200, 200)
             elif tiempo_transcurrido > tiempo_mensaje_bienvenida and mensaje_estado.startswith('Bienvenido'):
                 mensaje_estado = 'Recuerda que el blanco empieza primero'
-                color_mensaje = blanco
         
         pantalla.fill(blanco)
+
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                pygame.quit(); sys.exit()
                 
             elif evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
@@ -407,41 +400,67 @@ def main():
                     reiniciar_partida()
                     continue
 
-                if partida_terminada or not juego_iniciado:
-                    continue
+                if partida_terminada or not juego_iniciado: continue
+
+                if promocion_pendiente:
+                    if botones_promo:
+                        for tipo_pieza, rect in botones_promo.items():
+                            if rect.collidepoint(x, y):
+                                color = promocion_pendiente['color']
+                                col, fil = promocion_pendiente['posicion']
+                                pieza_a_borrar = promocion_pendiente['pieza']
+                                
+                                if pieza_a_borrar in posiciones_piezas:
+                                    del posiciones_piezas[pieza_a_borrar]
+                                
+                                nueva_pieza_nombre = f'{tipo_pieza}_{"blanca" if color=="blanco" else "negra"}_pro_{contador_nuevas_piezas}'
+                                contador_nuevas_piezas += 1
+                                
+                                simbolo = simbolos_piezas[tipo_pieza][color]
+                                color_rgb = blanco if color == 'blanco' else negro
+                                piezas[nueva_pieza_nombre] = generar_pieza(simbolo, color_rgb)
+                                
+                                posiciones_piezas[nueva_pieza_nombre] = (col, fil)
+                                piezas_movidas.add(nueva_pieza_nombre)
+                                
+                                promocion_pendiente = None
+                                actualizar_turno_y_estado()
+                                break
+                    continue 
 
                 columna, fila = x // tamaño_celda, y // tamaño_celda
                 
                 if pieza_seleccionada:
+                    col_origen, fil_origen = posiciones_piezas[pieza_seleccionada]
+                    
                     if movimiento_valido(pieza_seleccionada, (columna, fila)):
                         pieza_capturada = obtener_pieza_en(columna, fila)
                         if pieza_capturada:
                             del posiciones_piezas[pieza_capturada]
 
                         posiciones_piezas[pieza_seleccionada] = (columna, fila)
-                        turno = 'negro' if turno == 'blanco' else 'blanco'
+                        piezas_movidas.add(pieza_seleccionada)
 
-                        if turno == player1_color:
-                            mensaje_estado = 'Turno del Jugador 1'
-                            color_mensaje = blanco
+                        if 'rey' in pieza_seleccionada and abs(columna - col_origen) == 2:
+                            color_rey = obtener_color_pieza(pieza_seleccionada)
+                            if columna == 6: 
+                                nombre_torre = f'torre_{"blanca" if color_rey == "blanco" else "negra"}2'
+                                posiciones_piezas[nombre_torre] = (5, fila)
+                                piezas_movidas.add(nombre_torre)
+                            elif columna == 2: 
+                                nombre_torre = f'torre_{"blanca" if color_rey == "blanco" else "negra"}'
+                                posiciones_piezas[nombre_torre] = (3, fila)
+                                piezas_movidas.add(nombre_torre)
+
+                        if 'peon' in pieza_seleccionada and (fila == 0 or fila == 7):
+                            promocion_pendiente = {
+                                'pieza': pieza_seleccionada,
+                                'posicion': (columna, fila),
+                                'color': obtener_color_pieza(pieza_seleccionada)
+                            }
                         else:
-                            mensaje_estado = 'Turno del Jugador 2'
-                            color_mensaje = (200, 200, 200)
+                            actualizar_turno_y_estado()
 
-                        estado = evaluar_estado(turno)
-                        if estado == 'jaque_mate':
-                            partida_terminada = True
-                            if turno == 'blanco':
-                                mensaje_estado = f'Jaque mate - Gana Jugador 2'
-                            else:
-                                mensaje_estado = f'Jaque mate - Gana Jugador 1'
-                            color_mensaje = rojo
-                        elif estado == 'jaque':
-                            if turno == player1_color:
-                                mensaje_estado = f'¡Jugador 1 está en jaque!'
-                            else:
-                                mensaje_estado = f'¡Jugador 2 está en jaque!'
-                            color_mensaje = rojo
                     else:
                         casilla_invalida = (columna, fila)
                         tiempo_invalido = pygame.time.get_ticks()
@@ -457,17 +476,21 @@ def main():
                                 break
 
         dibujar_tablero()
-        dibujar_movimientos_validos()
+        if not promocion_pendiente:
+            dibujar_movimientos_validos()
         dibujar_casilla_invalida()
         dibujar_pieza()
         
         if not juego_iniciado:
-            dibujar_boton_empezar()
+            boton_rect = dibujar_boton('Empezar', 280, 150, 40, verde)
             
         dibujar_mensaje()
         
         if partida_terminada:
-            dibujar_boton_reiniciar()
+            boton_reiniciar_rect = dibujar_boton('Reiniciar', 562, 140, 36, (50, 120, 220))
+            
+        if promocion_pendiente:
+            botones_promo = dibujar_menu_promocion()
             
         pygame.display.flip()
 
