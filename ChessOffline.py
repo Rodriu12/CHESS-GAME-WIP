@@ -24,7 +24,11 @@ tiempo_inicio = None
 tiempo_mensaje_bienvenida = 3000
 tiempo_mensaje_instruccion = 6000
 juego_iniciado = False
-boton_rect = None
+
+# Variables para el menú de inicio
+menu_state = 'main'
+boton_2p_rect = None
+boton_vs_ia_rect = None
 boton_reiniciar_rect = None
 
 casilla_invalida = None
@@ -40,6 +44,10 @@ partida_terminada = False
 piezas_movidas = set()
 promocion_pendiente = None  
 contador_nuevas_piezas = 0  
+
+
+modo_ia = False
+tiempo_espera_ia = 0
 
 def generar_pieza(simbolo_unicode, color):
     superficie = pygame.Surface((tamaño_celda, tamaño_celda), pygame.SRCALPHA)
@@ -147,7 +155,11 @@ def movimiento_base_valido(pieza, nueva_posicion, posiciones=None, ignorar_enroq
                         if not casilla_atacada(5, fila, obtener_color_pieza(pieza), pos):
                             return True
             elif nueva_col == 2:
-                torre = f'torre_{"blanca" if obtener_color_pieza(pieza) == "blanco" else "negra"}'
+                if obtener_color_pieza(pieza) == "blanco":
+                    torre = 'torre_blanca'
+                else:
+                    torre = 'torre_negra'
+                    
                 if torre in pos and torre not in piezas_movidas:
                     if camino_libre(col, fila, 0, fila, pos):
                         if not casilla_atacada(3, fila, obtener_color_pieza(pieza), pos):
@@ -219,6 +231,74 @@ def evaluar_estado(turno_actual):
         return 'jaque'
     if not hay_movimientos_legales(turno_actual): return 'ahogado'
     return 'jugando'
+
+def obtener_valor_pieza(pieza):
+    if 'rey' in pieza: return 100
+    if 'reina' in pieza: return 9
+    if 'torre' in pieza: return 5
+    if 'alfil' in pieza or 'caballo' in pieza: return 3
+    if 'peon' in pieza: return 1
+    return 0
+
+def movimiento_ia():
+    global posiciones_piezas, piezas_movidas, turno, partida_terminada
+    color_ia = turno
+    
+    mejores_movimientos = []
+    mejor_puntaje = -1
+    
+    for pieza, (col, fil) in posiciones_piezas.items():
+        if obtener_color_pieza(pieza) != color_ia: continue
+        
+        for nueva_col in range(8):
+            for nueva_fila in range(8):
+                if movimiento_valido(pieza, (nueva_col, nueva_fila)):
+                    pieza_capturada = obtener_pieza_en(nueva_col, nueva_fila, posiciones_piezas)
+                    puntaje = 0
+        
+                    if pieza_capturada:
+                        puntaje = obtener_valor_pieza(pieza_capturada)
+                    
+                    if puntaje > mejor_puntaje:
+                        mejor_puntaje = puntaje
+                        mejores_movimientos = [(pieza, (nueva_col, nueva_fila))]
+                    elif puntaje == mejor_puntaje:
+                        mejores_movimientos.append((pieza, (nueva_col, nueva_fila)))
+    
+    if not mejores_movimientos:
+        return
+    
+
+    pieza, (col, fil) = random.choice(mejores_movimientos)
+    
+    col_origen, fil_origen = posiciones_piezas[pieza]
+    pieza_capturada = obtener_pieza_en(col, fil)
+    if pieza_capturada: del posiciones_piezas[pieza_capturada]
+    
+    posiciones_piezas[pieza] = (col, fil)
+    piezas_movidas.add(pieza)
+    
+    if 'rey' in pieza and abs(col - col_origen) == 2:
+        color = obtener_color_pieza(pieza)
+        if col == 6: 
+            nombre_torre = f'torre_{"blanca" if color == "blanco" else "negra"}2'
+            posiciones_piezas[nombre_torre] = (5, fil)
+            piezas_movidas.add(nombre_torre)
+        elif col == 2: 
+            nombre_torre = f'torre_{"blanca" if color == "blanco" else "negra"}'
+            posiciones_piezas[nombre_torre] = (3, fil)
+            piezas_movidas.add(nombre_torre)
+            
+    if 'peon' in pieza and (fil == 0 or fil == 7):
+        color = obtener_color_pieza(pieza)
+        if pieza in posiciones_piezas:
+            del posiciones_piezas[pieza]
+        nueva_pieza_nombre = f'reina_{"blanca" if color=="blanco" else "negra"}_ia_{contador_nuevas_piezas}'
+        piezas[nueva_pieza_nombre] = generar_pieza('♕' if color=='blanco' else '♛', blanco if color=='blanco' else negro)
+        posiciones_piezas[nueva_pieza_nombre] = (col, fil)
+        piezas_movidas.add(nueva_pieza_nombre)
+    
+    actualizar_turno_y_estado()
 
 def dibujar_tablero():
     for file in range(8):
@@ -311,7 +391,7 @@ def dibujar_menu_promocion():
 def reiniciar_partida():
     global posiciones_piezas, turno, player1_color, player2_color, pieza_seleccionada
     global partida_terminada, mensaje_estado, color_mensaje, tiempo_inicio, casilla_invalida
-    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas
+    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas, modo_ia
     
     posiciones_piezas = posiciones_iniciales.copy()
     piezas_movidas.clear()
@@ -335,17 +415,25 @@ def actualizar_turno_y_estado():
         mensaje_estado = 'Turno del Jugador 1'
         color_mensaje = blanco
     else:
-        mensaje_estado = 'Turno del Jugador 2'
+        mensaje_estado = 'Turno del Jugador 2' if not modo_ia else 'Pensando...'
         color_mensaje = (200, 200, 200)
 
     estado = evaluar_estado(turno)
     if estado == 'jaque_mate':
         partida_terminada = True
-        ganador = 'Jugador 2' if turno == 'blanco' else 'Jugador 1'
+        if modo_ia and turno == player1_color:
+            ganador = 'Jugador'
+        elif modo_ia and turno == player2_color:
+            ganador = 'IA'
+        else:
+            ganador = 'Jugador 2' if turno == 'blanco' else 'Jugador 1'
         mensaje_estado = f'Jaque mate - Gana {ganador}'
         color_mensaje = rojo
     elif estado == 'jaque':
-        jugador_jaque = 'Jugador 1' if turno == player1_color else 'Jugador 2'
+        if modo_ia:
+            jugador_jaque = 'Jugador' if turno == player1_color else 'IA'
+        else:
+            jugador_jaque = 'Jugador 1' if turno == player1_color else 'Jugador 2'
         mensaje_estado = f'¡{jugador_jaque} está en jaque!'
         color_mensaje = rojo
     elif estado == 'ahogado':
@@ -356,13 +444,15 @@ def actualizar_turno_y_estado():
 def main():
     global pantalla, turno, posiciones_piezas, pieza_seleccionada, mensaje_estado, color_mensaje
     global tiempo_inicio, juego_iniciado, player1_color, player2_color
-    global casilla_invalida, tiempo_invalido, partida_terminada
-    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas, boton_rect, boton_reiniciar_rect
+    global casilla_invalida, tiempo_invalido, partida_terminada, menu_state
+    global piezas_movidas, promocion_pendiente, contador_nuevas_piezas
+    global boton_2p_rect, boton_vs_ia_rect, boton_reiniciar_rect
+    global modo_ia, tiempo_espera_ia
 
     pantalla = pygame.display.set_mode((ancho, alto))
-    pygame.display.set_caption('Ajedrez con Enroque y Coronación')
+    pygame.display.set_caption('Ajedrez con IA')
     reiniciar_partida()
-    juego_iniciado = False
+    menu_state = 'main'
     mensaje_estado = 'Bienvenido al Ajedrez'
     botones_promo = {}
 
@@ -373,14 +463,22 @@ def main():
             tiempo_transcurrido = tiempo_actual - tiempo_inicio
             if tiempo_transcurrido > tiempo_mensaje_instruccion and mensaje_estado == 'Recuerda que el blanco empieza primero':
                 if turno == player1_color:
-                    mensaje_estado = 'Turno del Jugador 1'
+                    mensaje_estado = 'Turno del Jugador' if modo_ia else 'Turno del Jugador 1'
                     color_mensaje = blanco
                 else:
-                    mensaje_estado = 'Turno del Jugador 2'
+                    mensaje_estado = 'Turno de la IA' if modo_ia else 'Turno del Jugador 2'
                     color_mensaje = (200, 200, 200)
             elif tiempo_transcurrido > tiempo_mensaje_bienvenida and mensaje_estado.startswith('Bienvenido'):
                 mensaje_estado = 'Recuerda que el blanco empieza primero'
         
+        if juego_iniciado and modo_ia and not partida_terminada and not promocion_pendiente and turno != player1_color:
+            if tiempo_espera_ia == 0:
+                tiempo_espera_ia = tiempo_actual + 300
+            elif tiempo_actual >= tiempo_espera_ia:
+                movimiento_ia()
+                tiempo_espera_ia = 0
+                pieza_seleccionada = None
+
         pantalla.fill(blanco)
 
         for evento in pygame.event.get():
@@ -390,10 +488,23 @@ def main():
             elif evento.type == pygame.MOUSEBUTTONDOWN:
                 x, y = evento.pos
                 
-                if not juego_iniciado and boton_rect and boton_rect.collidepoint(x, y):
-                    juego_iniciado = True
-                    tiempo_inicio = pygame.time.get_ticks()
-                    mensaje_estado = 'Recuerda que el blanco empieza primero'
+                if menu_state == 'main':
+                    if boton_2p_rect and boton_2p_rect.collidepoint(x, y):
+                        modo_ia = False
+                        menu_state = 'playing'
+                        juego_iniciado = True
+                        tiempo_inicio = pygame.time.get_ticks()
+                        mensaje_estado = 'Recuerda que el blanco empieza primero'
+                        continue
+                    elif boton_vs_ia_rect and boton_vs_ia_rect.collidepoint(x, y):
+                        modo_ia = True
+                        menu_state = 'playing'
+                        juego_iniciado = True
+                        tiempo_inicio = pygame.time.get_ticks()
+                        mensaje_estado = 'Recuerda que el blanco empieza primero'
+                        continue
+                
+                if juego_iniciado and modo_ia and not partida_terminada and turno != player1_color:
                     continue
                 
                 if partida_terminada and boton_reiniciar_rect and boton_reiniciar_rect.collidepoint(x, y):
@@ -448,7 +559,10 @@ def main():
                                 posiciones_piezas[nombre_torre] = (5, fila)
                                 piezas_movidas.add(nombre_torre)
                             elif columna == 2: 
-                                nombre_torre = f'torre_{"blanca" if color_rey == "blanco" else "negra"}'
+                                if color_rey == 'blanco':
+                                    nombre_torre = 'torre_blanca'
+                                else:
+                                    nombre_torre = 'torre_negra'
                                 posiciones_piezas[nombre_torre] = (3, fila)
                                 piezas_movidas.add(nombre_torre)
 
@@ -481,13 +595,14 @@ def main():
         dibujar_casilla_invalida()
         dibujar_pieza()
         
-        if not juego_iniciado:
-            boton_rect = dibujar_boton('Empezar', 280, 150, 40, verde)
+        if menu_state == 'main':
+            boton_2p_rect = dibujar_boton('2 Jugadores', 260, 150, 40, verde)
+            boton_vs_ia_rect = dibujar_boton('vs IA', 320, 150, 40, (220, 50, 50))
             
         dibujar_mensaje()
         
-        if partida_terminada:
-            boton_reiniciar_rect = dibujar_boton('Reiniciar', 562, 140, 36, (50, 120, 220))
+        if partida_terminada and juego_iniciado:
+            boton_reiniciar_rect = dibujar_boton('Reiniciar', 290, 150, 40, (50, 120, 220))
             
         if promocion_pendiente:
             botones_promo = dibujar_menu_promocion()
