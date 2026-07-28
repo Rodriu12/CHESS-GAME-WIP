@@ -118,7 +118,7 @@ Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Ju
 **Modo Online**
 * Aquí vemos como el jugador 1 y el 2 se conectan a través de la IP (para demostración usamos 127.0.0.1 para jugar en el mismo computador).
 
-![Demostración del modo online](videos/ajedrez_online_demo.mp4)
+![Demostración del modo online a través de la misma pc](videos/ajedrez_online_demo.mp4)
 
 ## ¿Dónde ver los cambios recientes?
 Consulta el [registro de actualizaciones](CHANGELOG.md) para ver los cambios y mejoras recientes que se hagan durante este tiempo y ponerte al día.
