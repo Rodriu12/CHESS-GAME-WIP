@@ -1,3 +1,7 @@
+## Actualización 1.2 28/07/2026
+**Novedades**
+* Se agregó una IA para el modo de un solo jugador.
+
 ## Actualización 1.1.3 27/07/2026
 **Novedades**
 * Se agregó el enroque y la promoción de los peones al llegar al final del tablero permitiendo elegir entre reina, caballo, alfil y torre.
