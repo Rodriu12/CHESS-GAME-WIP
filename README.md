@@ -111,12 +111,12 @@ Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Ju
 
 ## Videos de demostración del juego
 **Modo Offline**
-* Aquí vemos como dos jugadores quedan con solo el caballo del color negro como único superviviente de la partida (esto no puede pasar en el juego real, pero como ven puede llegar a pasar y lo único que habría que hacer es dejar en jaque mate al rey usando técnicas que ustedes conozcan).
+* Aquí vemos como dos jugadores quedan con solo el caballo del color negro como único superviviente de la partida (esto no puede pasar en el juego real, pero como ven puede llegar a pasar y lo único que habría que hacer es dejar en jaque mate al rey usando técnicas que ustedes conozcan). Presiona la imagen para ver el vídeo demostrativo.
 
 [![Demostración de como se ve y juega](assets/ajedrez_demo_cap.png)](https://www.youtube.com/watch?v=f_pCm4Q7XFw)
 
 **Modo Online**
-* Aquí vemos como el jugador 1 y el 2 se conectan a través de la IP (para demostración usamos 127.0.0.1 para jugar en el mismo computador).
+* Aquí vemos como el jugador 1 y el 2 se conectan a través de la IP (para demostración usamos 127.0.0.1 para jugar en el mismo computador). Presiona la imagen para ver el vídeo demostrativo.
 
 [![Demostración de como se ve y juega](assets/ajedrez_demo_online_cap.png)](https://www.youtube.com/watch?v=onjQO1FCO-c)
 
