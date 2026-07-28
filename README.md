@@ -72,6 +72,8 @@ python ChessOnline.py
 
 * Está permitida la promoción de los peones al llegar al final del tablero, permitiéndote elegir entre reina, caballo, alfil y torre.
 
+* Puedes jugar contra la IA para probar tus habilidades como jugador profesional de ajedrez.
+
 **Modo Online / Red (Ajedrez.exe o ChessOnline.py si eres desarrolador)**
 Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Jugador 1) y el otro el Cliente (Jugador 2).
 
