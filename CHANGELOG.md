@@ -1,3 +1,7 @@
+## Actualización 1.2.1 28/07/2026
+**Novedades**
+* Se corrigió un mensaje erróneo en el modo IA.
+
 ## Actualización 1.2 28/07/2026
 **Novedades**
 * Se agregó una IA para el modo de un solo jugador.
