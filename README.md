@@ -66,6 +66,12 @@ python ChessOnline.py
 
 * La barra inferior te indicará el turno actual y si estás en Jaque.
 
+* Al seleccionar la pieza se te mostrará dependiendo de su movimiento, la casilla a la que puede moverse y se pondrá en amarillo la casilla de la pieza seleccionada. (En el modo online también está implementado).
+
+* Está permitido hacer enroque siempre y cuando no hayan piezas entre la torre y el rey.
+
+* Está permitida la promoción de los peones al llegar al final del tablero, permitiéndote elegir entre reina, caballo, alfil y torre.
+
 **Modo Online / Red (Ajedrez.exe o ChessOnline.py si eres desarrolador)**
 Este modo requiere que dos jugadores ejecuten el programa. Uno será el Host (Jugador 1) y el otro el Cliente (Jugador 2).
 
