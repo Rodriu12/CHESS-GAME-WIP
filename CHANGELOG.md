@@ -1,3 +1,8 @@
+## Actualización 1.1.3 27/07/2026
+**Novedades**
+* Se agregó el enroque y la promoción de los peones al llegar al final del tablero permitiendo elegir entre reina, caballo, alfil y torre.
+* Se corrigieron errores en los mensajes.
+
 ## Actualización 1.1.2 26/07/2026
 **Novedades**
 * Ahora se ven las posibles casillas libres a las que puede moverse cualquier pieza dependiendo de su movimiento. Mostrándolas en un circulo verde y en amarillo la pieza seleccionada.
