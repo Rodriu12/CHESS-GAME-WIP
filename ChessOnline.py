@@ -19,7 +19,7 @@ verde = (40, 180, 80)
 azul = (100, 200, 255)
 gris_claro = (240, 240, 240)
 
-# Mensajes de estado como el de bienvenida y también de ganador, jaque o jaque mate
+# Mensajes de estado
 mensaje_estado = 'Bienvenido a Chess Game'
 color_mensaje = blanco
 juego_iniciado = False
@@ -33,7 +33,7 @@ piezas_movidas = set()
 promocion_pendiente = None
 contador_nuevas_piezas = 0
 
-# Lógica de la red al hostear la partida y a la conexión entrante del otro jugador
+# Lógica de la red
 HOST = 'localhost'
 PORT = 5555
 sock = None
@@ -41,13 +41,11 @@ net_queue = queue.Queue()
 net_thread = None
 modo_online = False
 mi_color = 'blanco'
-player1_color = 'blanco'
-player2_color = 'negro'
-host_ip_input = "localhost"
+host_ip_input = "0.0.0.0"
 ip_input_activo = False
 net_status = 'none'
 
-# Control de turno (para el modo LAN)
+# Control de turno
 turno = 'blanco'
 partida_terminada = False
 
@@ -82,7 +80,7 @@ simbolos_piezas = {
     'caballo': {'blanco': '♘', 'negro': '♞'}
 }
 
-# Diccionario de las piezas de ajedrez
+# Diccionario de las piezas
 piezas = {
     'rey_blanco': generar_pieza('♔', blanco), 'rey_negro': generar_pieza('♚', negro),
     'reina_blanca': generar_pieza('♕', blanco), 'reina_negra': generar_pieza('♛', negro),
@@ -96,7 +94,7 @@ piezas = {
     **{f'peon_negro{i}': generar_pieza('♟', negro) for i in range(8)}
 }
 
-# Posiciones de las piezas de ajedrez
+# Posiciones de las piezas
 posiciones_piezas = {
     'rey_blanco': (4,0), 'rey_negro': (4,7),
     'reina_blanca': (3,0), 'reina_negra': (3,7),
@@ -441,17 +439,15 @@ def evaluar_estado(turno_actual):
 def main():
     global pantalla, turno, posiciones_piezas, pieza_seleccionada
     global mensaje_estado, color_mensaje, juego_iniciado
-    global modo_online, mi_color, player1_color, player2_color, sock, net_thread, partida_terminada, net_status
+    global modo_online, mi_color, sock, net_thread, partida_terminada, net_status
     global host_ip_input, ip_input_activo, casilla_invalida, tiempo_invalido
     global promocion_pendiente, contador_nuevas_piezas, piezas_movidas
 
     pantalla = pygame.display.set_mode((ancho, alto))
-    pygame.display.set_caption('Ajedrez')
+    pygame.display.set_caption('Ajedrez Online')
     pieza_seleccionada = None
 
     modo_seleccionado = None
-    
-    boton_local = pygame.Rect(ancho//2 - 100, 150, 200, 40)
     input_rect = pygame.Rect(ancho//2 - 100, 240, 200, 30)
     boton_host = pygame.Rect(ancho//2 - 100, 310, 200, 40)
     boton_join = pygame.Rect(ancho//2 - 100, 370, 200, 40)
@@ -462,8 +458,6 @@ def main():
                 pygame.quit(); sys.exit()
             
             if evento.type == pygame.MOUSEBUTTONDOWN:
-                if boton_local.collidepoint(evento.pos):
-                    modo_seleccionado = 'local'
                 if boton_host.collidepoint(evento.pos):
                     modo_seleccionado = 'host'
                 if boton_join.collidepoint(evento.pos):
@@ -484,11 +478,11 @@ def main():
 
         pantalla.fill(blanco)
         fuente_titulo = pygame.font.SysFont('arial', 30, bold=True)
-        titulo = fuente_titulo.render('SELECCIONA EL MODO', True, negro)
+        titulo = fuente_titulo.render('Menú del juego', True, negro)
         pantalla.blit(titulo, (ancho//2 - titulo.get_width()//2, 80))
-        
+
         fuente_label = pygame.font.SysFont('arial', 16, bold=True)
-        label = fuente_label.render("Dirección IP (Host / Cliente):", True, negro)
+        label = fuente_label.render("Dirección IP:", True, negro)
         pantalla.blit(label, (ancho//2 - label.get_width()//2, 218))
 
         color_input = gris_claro if ip_input_activo else blanco
@@ -500,47 +494,35 @@ def main():
         pantalla.blit(texto_ip, (input_rect.x + 5, input_rect.y + 5))
 
         fuente_inst = pygame.font.SysFont('arial', 14)
-        texto_inst1 = fuente_inst.render('(Deja vacío para usar 0.0.0.0 si eres el Host)', True, (100,100,100))
+        texto_inst1 = fuente_inst.render('(Deja 0.0.0.0 si eres el Jugador 1 para que se conecte fácilmente tu oponente)', True, (100,100,100))
         pantalla.blit(texto_inst1, (ancho//2 - texto_inst1.get_width()//2, 278))
 
-        dibujar_boton("Local (2 Jugadores)", boton_local, azul, blanco)
-        dibujar_boton("Crear Partida (Host)", boton_host, verde, blanco)
+        dibujar_boton("Crear Partida (Jugador1)", boton_host, verde, blanco)
         dibujar_boton("Unirse a Partida", boton_join, (220, 100, 50), blanco)
 
         pygame.display.flip()
-
-    if modo_seleccionado in ['host', 'join']:
-        modo_online = True
-        net_status = 'waiting'
-        juego_iniciado = True
         
-        ip_final = host_ip_input.strip()
-        if ip_final == "":
-            ip_final = "0.0.0.0"
+    modo_online = True
+    net_status = 'waiting'
+    juego_iniciado = True
+    
+    ip_final = host_ip_input.strip()
+    if ip_final == "":
+        ip_final = "0.0.0.0"
 
-        if modo_seleccionado == 'host':
-            mensaje_estado = f"Esperando en IP: {ip_final}:{PORT}..."
-            color_mensaje = (200, 200, 200)
-            thread = threading.Thread(target=hilo_esperar_host, args=(ip_final,), daemon=True)
-            thread.start()
-        else:
-            mensaje_estado = f"Conectando a {ip_final}:{PORT}..."
-            color_mensaje = (200, 200, 200)
-            thread = threading.Thread(target=hilo_conectar_cliente, args=(ip_final,), daemon=True)
-            thread.start()
+    if modo_seleccionado == 'host':
+        mensaje_estado = f"Esperando en IP: {ip_final}:{PORT}..."
+        color_mensaje = (200, 200, 200)
+        thread = threading.Thread(target=hilo_esperar_host, args=(ip_final,), daemon=True)
+        thread.start()
     else:
-        modo_online = False
-        mi_color = None
-        player1_color = random.choice(['blanco', 'negro'])
-        player2_color = 'negro' if player1_color == 'blanco' else 'blanco'
-        juego_iniciado = True
-        turno = 'blanco'
-        mensaje_estado = f'Bienvenido al modo Local. Blancas: Jugador {"1" if player1_color == "blanco" else "2"}'
-        color_mensaje = blanco
-        net_status = 'connected'
+        mensaje_estado = f"Conectando a {ip_final}:{PORT}..."
+        color_mensaje = (200, 200, 200)
+        thread = threading.Thread(target=hilo_conectar_cliente, args=(ip_final,), daemon=True)
+        thread.start()
 
     while True:
-        if modo_online and net_status == 'waiting':
+        if net_status == 'waiting':
             pantalla.fill(blanco)
             fuente = pygame.font.SysFont('arial', 24, bold=True)
             texto = fuente.render(mensaje_estado, True, color_mensaje)
@@ -562,7 +544,7 @@ def main():
             pygame.display.flip()
             continue
 
-        if modo_online and net_status == 'error':
+        if net_status == 'error':
             pantalla.fill(blanco)
             fuente = pygame.font.SysFont('arial', 24, bold=True)
             texto = fuente.render(mensaje_estado, True, rojo)
@@ -581,7 +563,7 @@ def main():
             pygame.display.flip()
             continue
 
-        if modo_online and net_status == 'connected' and not net_thread:
+        if net_status == 'connected' and not net_thread:
             if modo_seleccionado == 'host':
                 mi_color = random.choice(['blanco', 'negro'])
                 enviar_datos(f"COLOR|{'negro' if mi_color == 'blanco' else 'blanco'}")
@@ -600,7 +582,7 @@ def main():
             net_thread = threading.Thread(target=recibir_datos, daemon=True)
             net_thread.start()
 
-        if modo_online and net_thread:
+        if net_thread:
             try:
                 while True:
                     data = net_queue.get_nowait()
@@ -623,7 +605,6 @@ def main():
                                 posiciones_piezas[nombre_torre] = (3, fil)
                             piezas_movidas.add(nombre_torre)
 
-                        color_oponente = 'negro' if mi_color == 'blanco' else 'blanco'
                         estado = evaluar_estado(mi_color)
                         if estado == 'jaque_mate':
                             partida_terminada = True
@@ -651,6 +632,7 @@ def main():
                         posiciones_piezas[nuevo_nombre] = (col, fil)
                         piezas_movidas.add(nuevo_nombre)
                         
+                        # Comprobamos si estamos en jaque después de la promoción del oponente
                         estado = evaluar_estado(mi_color)
                         if estado == 'jaque_mate':
                             partida_terminada = True
@@ -716,48 +698,30 @@ def main():
                                 posiciones_piezas[nueva_pieza_nombre] = (col, fil)
                                 piezas_movidas.add(nueva_pieza_nombre)
 
-                                if modo_online:
-                                    enviar_datos(f"PROMO|{pieza_a_borrar}|{tipo_pieza}|{nueva_pieza_nombre}|{col}|{fil}")
-                                    turno = 'negro' if mi_color == 'blanco' else 'blanco'
-                                    mensaje_estado = "Esperando al oponente..."
-                                    color_mensaje = (150, 150, 150)
-                                else:
-                                    turno = 'negro' if turno == 'blanco' else 'blanco'
-                                    if turno == player1_color:
-                                        mensaje_estado = 'Turno del Jugador 1'
-                                        color_mensaje = blanco
-                                    else:
-                                        mensaje_estado = 'Turno del Jugador 2'
-                                        color_mensaje = (200, 200, 200)
+                                enviar_datos(f"PROMO|{pieza_a_borrar}|{tipo_pieza}|{nueva_pieza_nombre}|{col}|{fil}")
+                                turno = 'negro' if mi_color == 'blanco' else 'blanco'
+                                mensaje_estado = "Esperando al oponente..."
+                                color_mensaje = (150, 150, 150)
 
                                 estado = evaluar_estado(turno)
                                 if estado == 'jaque_mate':
                                     partida_terminada = True
-                                    if modo_online:
-                                        ganador_txt = "Jugador 1" if turno != mi_color else "Jugador 2"
-                                        mensaje_estado = f'Jaque mate - Gana {ganador_txt}'
-                                        enviar_datos(f"GAMEOVER|Has perdido por Jaque Mate")
-                                    else:
-                                        if turno == 'blanco':
-                                            mensaje_estado = f'Jaque mate - Gana Jugador 2'
-                                        else:
-                                            mensaje_estado = f'Jaque mate - Gana Jugador 1'
+                                    ganador_txt = "Jugador 1" if turno != mi_color else "Jugador 2"
+                                    mensaje_estado = f'Jaque mate - Gana {ganador_txt}'
+                                    enviar_datos(f"GAMEOVER|Has perdido por Jaque Mate")
                                     color_mensaje = rojo
                                 elif estado == 'jaque':
-                                    if modo_online:
-                                        if turno == mi_color:
-                                            mensaje_estado = 'Tu turno, estás en jaque'
-                                        else:
-                                            mensaje_estado = '¡El oponente está en jaque!'
+                                    if turno == mi_color:
+                                        mensaje_estado = 'Tu turno, estás en jaque'
                                     else:
-                                        mensaje_estado = f'¡Jugador {"1" if turno=="blanco" else "2"} está en jaque!'
+                                        mensaje_estado = '¡El oponente está en jaque!'
                                     color_mensaje = rojo
 
                                 promocion_pendiente = None
                                 break
                     continue
 
-                if modo_online and turno != mi_color:
+                if turno != mi_color:
                     continue
 
                 columna, fila = x // tamaño_celda, y // tamaño_celda
@@ -797,47 +761,29 @@ def main():
                             }
 
                         if not es_promocion:
-                            if modo_online:
-                                enviar_datos(f"MOVE|{pieza_seleccionada}|{columna}|{fila}|{datos_enroque_str}")
+                            enviar_datos(f"MOVE|{pieza_seleccionada}|{columna}|{fila}|{datos_enroque_str}")
 
                             turno = 'negro' if turno == 'blanco' else 'blanco'
 
-                            if modo_online:
-                                if turno == mi_color:
-                                    mensaje_estado = "Tu turno"
-                                    color_mensaje = blanco
-                                else:
-                                    mensaje_estado = "Esperando al oponente..."
-                                    color_mensaje = (150, 150, 150)
+                            if turno == mi_color:
+                                mensaje_estado = "Tu turno"
+                                color_mensaje = blanco
                             else:
-                                if turno == player1_color:
-                                    mensaje_estado = 'Turno del Jugador 1'
-                                    color_mensaje = blanco
-                                else:
-                                    mensaje_estado = 'Turno del Jugador 2'
-                                    color_mensaje = (200, 200, 200)
+                                mensaje_estado = "Esperando al oponente..."
+                                color_mensaje = (150, 150, 150)
 
                             estado = evaluar_estado(turno)
                             if estado == 'jaque_mate':
                                 partida_terminada = True
-                                if modo_online:
-                                    ganador_txt = "Jugador 1" if turno != mi_color else "Jugador 2"
-                                    mensaje_estado = f'Jaque mate - Gana {ganador_txt}'
-                                    enviar_datos(f"GAMEOVER|Has perdido por Jaque Mate")
-                                else:
-                                    if turno == 'blanco':
-                                        mensaje_estado = f'Jaque mate - Gana Jugador 2'
-                                    else:
-                                        mensaje_estado = f'Jaque mate - Gana Jugador 1'
+                                ganador_txt = "Jugador 1" if turno != mi_color else "Jugador 2"
+                                mensaje_estado = f'Jaque mate - Gana {ganador_txt}'
+                                enviar_datos(f"GAMEOVER|Has perdido por Jaque Mate")
                                 color_mensaje = rojo
                             elif estado == 'jaque':
-                                if modo_online:
-                                    if turno == mi_color:
-                                        mensaje_estado = 'Tu turno, estás en jaque'
-                                    else:
-                                        mensaje_estado = '¡El oponente está en jaque!'
+                                if turno == mi_color:
+                                    mensaje_estado = 'Tu turno, estás en jaque'
                                 else:
-                                    mensaje_estado = f'¡Jugador {"1" if turno=="blanco" else "2"} está en jaque!'
+                                    mensaje_estado = '¡El oponente está en jaque!'
                                 color_mensaje = rojo
                     else:
                         casilla_invalida = (columna, fila)
